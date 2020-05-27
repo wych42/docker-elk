@@ -1,4 +1,4 @@
-version: '3.2'
+version: "3.2"
 
 services:
   elasticsearch:
@@ -12,17 +12,48 @@ services:
         target: /usr/share/elasticsearch/config/elasticsearch.yml
         read_only: true
       - type: volume
-        source: elasticsearch
+        source: esdata01
         target: /usr/share/elasticsearch/data
+      - type: volume
+        source: eslog01
+        target: /usr/share/elasticsearch/logs
+      - type: bind
+        source: ./tls/certs
+        target: $CERTS_DIR
+        read_only: true
     ports:
-      - "9200:9200"
-      - "9300:9300"
+      - "9220:9200"
+      - "9320:9300"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
     environment:
-      ES_JAVA_OPTS: "-Xmx256m -Xms256m"
+      bootstrap.memory_lock: "true"
+      ES_JAVA_OPTS: "-Xmx2g -Xms2g"
       ELASTIC_PASSWORD: changeme
-      # Use single node discovery in order to disable production mode and avoid bootstrap checks
-      # see https://www.elastic.co/guide/en/elasticsearch/reference/current/bootstrap-checks.html
-      discovery.type: single-node
+
+      node.name: ${NODE_NAME}
+      http.port: 9200
+      http.publish_port: 9220
+      network.host: 0.0.0.0
+      network.publish_host: ${NODE_IP}
+      transport.tcp.port: 9300
+      transport.publish_port: 9320
+      cluster.initial_master_nodes: "es01.yuchi.lab:9320"
+      discovery.seed_hosts: "es01.yuchi.lab:9320"
+
+      xpack.security.enabled: "true"
+      xpack.security.http.ssl.enabled: "true"
+      xpack.security.http.ssl.key: ${CERTS_DIR}/${NODE_NAME}/${NODE_NAME}.key
+      xpack.security.http.ssl.certificate_authorities: ${CERTS_DIR}/ca/ca.crt
+      xpack.security.http.ssl.certificate: ${CERTS_DIR}/${NODE_NAME}/${NODE_NAME}.crt
+      xpack.security.transport.ssl.enabled: "true"
+      xpack.security.transport.ssl.verification_mode: certificate
+      xpack.security.transport.ssl.certificate: ${CERTS_DIR}/${NODE_NAME}/${NODE_NAME}.crt
+      xpack.security.transport.ssl.certificate_authorities: ${CERTS_DIR}/ca/ca.crt
+      xpack.security.transport.ssl.key: ${CERTS_DIR}/${NODE_NAME}/${NODE_NAME}.key
+
     networks:
       - elk
 
@@ -40,16 +71,19 @@ services:
         source: ./logstash/pipeline
         target: /usr/share/logstash/pipeline
         read_only: true
+      - type: bind
+        source: ./tls/certs
+        target: $CERTS_DIR
+        read_only: true
     ports:
       - "5000:5000/tcp"
       - "5000:5000/udp"
       - "9600:9600"
     environment:
       LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+      LS_CACERT_FILE: "${CERTS_DIR}/ca/ca.crt"
     networks:
       - elk
-    depends_on:
-      - elasticsearch
 
   kibana:
     build:
@@ -61,16 +95,32 @@ services:
         source: ./kibana/config/kibana.yml
         target: /usr/share/kibana/config/kibana.yml
         read_only: true
+      - type: bind
+        source: ./tls/certs
+        target: $CERTS_DIR
+        read_only: true
+    environment:
+      ELASTICSEARCH_HOSTS: "https://es01.yuchi.lab:9320"
+      ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES: "${CERTS_DIR}/ca/ca.crt"
     ports:
       - "5601:5601"
     networks:
       - elk
-    depends_on:
-      - elasticsearch
 
 networks:
   elk:
     driver: bridge
 
 volumes:
-  elasticsearch:
+  esdata01:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "/data/es/${NODE_NAME}-data/"
+  eslog01:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "/data/es/${NODE_NAME}-log/"
