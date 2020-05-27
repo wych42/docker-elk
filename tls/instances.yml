@@ -1,0 +1,28 @@
+instances:
+  - name: es01.yuchi.lab
+    dns:
+      - es01.yuchi.lab
+      - localhost
+      - es01
+      - elasticsearch
+    ip:
+      - 127.0.0.1
+      - 10.11.12.13
+  - name: es02.yuchi.lab
+    dns:
+      - es02.yuchi.lab
+      - localhost
+      - es02
+      - elasticsearch
+    ip:
+      - 127.0.0.1
+      - 10.11.12.14
+  - name: es03.yuchi.lab
+    dns:
+      - es03.yuchi.lab
+      - localhost
+      - es03
+      - elasticsearch
+    ip:
+      - 127.0.0.1
+      - 10.11.12.15
